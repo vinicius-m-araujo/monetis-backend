@@ -3,23 +3,26 @@ using System.Security.Claims;
 using System.Text;
 
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 using Monetis.Application.Abstractions.Security;
 
 namespace Monetis.Infrastructure.Security;
 
-public class TokenService(IConfiguration configuration) : ITokenService
+public class TokenService : ITokenService
 {
+    private readonly JwtOptions _jwtOptions;
+    private readonly SigningCredentials _signingCredentials;
+
+    public TokenService(IOptions<JwtOptions> jwtOptions)
+    {
+        _jwtOptions = jwtOptions.Value;
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.Key));
+        _signingCredentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+    }
     public string GenerateToken(Guid userId, string email)
     {
-        var jwtKey = configuration["Jwt:Key"];
-        var issuer = configuration["Jwt:Issuer"];
-        var audience = configuration["Jwt:Audience"];
-
-        if (string.IsNullOrWhiteSpace(jwtKey))
-            throw new InvalidOperationException("JWT key is not configured.");
-
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
@@ -27,16 +30,13 @@ public class TokenService(IConfiguration configuration) : ITokenService
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
-            Expires = DateTime.UtcNow.AddDays(2),
-            Issuer = issuer,
-            Audience = audience,
-            SigningCredentials = creds
+            Expires = DateTime.UtcNow.AddMinutes(_jwtOptions.DurationInMinutes),
+            Issuer = _jwtOptions.Issuer,
+            Audience = _jwtOptions.Audience,
+            SigningCredentials = _signingCredentials
         };
 
         var tokenHandler = new JwtSecurityTokenHandler();

@@ -34,8 +34,27 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IExpenseRepository, ExpenseRepository>();
-        services.AddScoped<ITokenService, TokenService>();
+        services.AddSingleton<ITokenService, TokenService>();
         services.AddScoped<IIncomeRepository, IncomeRepository>();
+        services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        JwtConfig(services, configuration);
+
+
+        services.AddAuthorization();
+
+        return services;
+    }
+
+    private static void JwtConfig(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<JwtOptions>()
+            .BindConfiguration(JwtOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        var jwtOptions =
+            configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
+            ?? throw new InvalidOperationException("JWT settings are not configured properly.");
 
         //token
         services.AddAuthentication(options =>
@@ -51,15 +70,11 @@ public static class DependencyInjection
                     ValidateAudience = true,
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
-                    ValidIssuer = configuration["Jwt:Issuer"],
-                    ValidAudience = configuration["Jwt:Audience"],
+                    ValidIssuer = jwtOptions.Issuer,
+                    ValidAudience = jwtOptions.Audience,
                     IssuerSigningKey = new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes(configuration["Jwt:Key"]!))
+                        Encoding.UTF8.GetBytes(jwtOptions.Key))
                 };
             });
-
-        services.AddAuthorization();
-
-        return services;
     }
 }
