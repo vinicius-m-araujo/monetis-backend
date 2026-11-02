@@ -14,13 +14,13 @@ public class AccountService(
     public async Task<AccountResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var account = await accountRepository.GetByIdReadOnlyAsync(id, cancellationToken);
-        return account == null ? null : new AccountResponse(account.Id, account.Name, account.UserId, account.Type, account.Balance);
+        return account == null ? null : new AccountResponse(account.Id, account.Name, account.Type, account.Balance);
     }
 
     public async Task<IEnumerable<AccountResponse>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var accounts = await accountRepository.GetAllReadOnlyAsync(cancellationToken);
-        return accounts.Select(a => new AccountResponse(a.Id, a.Name, a.UserId, a.Type, a.Balance));
+        return accounts.Select(a => new AccountResponse(a.Id, a.Name,a.Type, a.Balance));
     }
 
     public async Task<AccountResponse> CreateAsync(CreateAccountRequest createDto, CancellationToken cancellationToken = default)
@@ -28,7 +28,7 @@ public class AccountService(
         var account = new Account(createDto.Name, createDto.Type);
         accountRepository.Create(account);
         await unitOfWork.CommitAsync(cancellationToken);
-        return new AccountResponse(account.Id, account.Name, account.UserId, account.Type, account.Balance);
+        return new AccountResponse(account.Id, account.Name, account.Type, account.Balance);
     }
 
     public async Task UpdateAsync(Guid id, UpdateAccountRequest updateDto, CancellationToken cancellationToken = default)

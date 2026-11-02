@@ -16,13 +16,13 @@ public class CategoryService(
     public async Task<CategoryResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var category = await categoryRepository.GetByIdReadOnlyAsync(id, cancellationToken);
-        return category == null ? null : new CategoryResponse(category.Id, category.Name, category.UserId ?? Guid.Empty, category.Icon);
+        return category == null ? null : new CategoryResponse(category.Id, category.Name, category.Icon);
     }
 
     public async Task<IEnumerable<CategoryResponse>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var categories = await categoryRepository.GetAllReadOnlyAsync(cancellationToken);
-        return categories.Select(c => new CategoryResponse(c.Id, c.Name, c.UserId ?? Guid.Empty, c.Icon));
+        return categories.Select(c => new CategoryResponse(c.Id, c.Name, c.Icon));
     }
 
     public async Task<CategoryResponse> CreateAsync(
@@ -33,7 +33,7 @@ public class CategoryService(
         var category = new Category(createDto.Name, userId, createDto.Icon);
         categoryRepository.Create(category);
         await unitOfWork.CommitAsync(cancellationToken);
-        return new CategoryResponse(category.Id, category.Name, category.UserId ?? Guid.Empty, category.Icon);
+        return new CategoryResponse(category.Id, category.Name, category.Icon);
     }
 
     public async Task UpdateAsync(Guid id, UpdateCategoryRequest updateDto, CancellationToken cancellationToken = default)

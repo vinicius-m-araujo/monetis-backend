@@ -14,13 +14,13 @@ public class CardService(
     public async Task<CardResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var card = await cardRepository.GetByIdReadOnlyAsync(id, cancellationToken);
-        return card == null ? null : new CardResponse(card.Id, card.Name, card.UserId);
+        return card == null ? null : new CardResponse(card.Id, card.Name);
     }
 
     public async Task<IEnumerable<CardResponse>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var cards = await cardRepository.GetAllReadOnlyAsync(cancellationToken);
-        return cards.Select(c => new CardResponse(c.Id, c.Name, c.UserId));
+        return cards.Select(c => new CardResponse(c.Id, c.Name));
     }
 
     public async Task<CardResponse> CreateAsync(CreateCardRequest createDto, CancellationToken cancellationToken = default)
@@ -28,7 +28,7 @@ public class CardService(
         var card = new Card(createDto.Name);
         cardRepository.Create(card);
         await unitOfWork.CommitAsync(cancellationToken);
-        return new CardResponse(card.Id, card.Name, card.UserId);
+        return new CardResponse(card.Id, card.Name);
     }
 
     public async Task UpdateAsync(Guid id, UpdateCardRequest updateDto, CancellationToken cancellationToken = default)
