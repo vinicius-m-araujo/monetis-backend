@@ -37,21 +37,16 @@ public class TransfersController(ITransferService transferService) : ApiControll
         return CreatedAtAction(nameof(GetById), new { id = transfer.Id }, transfer);
     }
 
+
+    //TODO revise the update method to handle exceptions and return appropriate responses
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(
         [FromRoute] Guid id,
         [FromBody] UpdateTransferRequest updateTransferRequest,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            await transferService.UpdateAsync(id, updateTransferRequest, cancellationToken);
-            return NoContent();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
+        await transferService.UpdateAsync(id, updateTransferRequest, cancellationToken);
+        return NoContent();
     }
 
     [HttpDelete("{id}")]

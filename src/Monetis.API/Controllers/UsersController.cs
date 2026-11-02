@@ -26,20 +26,13 @@ public class UsersController(IUserService userService) : ApiControllerBase
         var users = await userService.GetAllAsync(cancellationToken);
         return Ok(users);
     }
-
+    //TODO revise the create method to handle exceptions and return appropriate responses
     [Authorize]
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(Guid id, UpdateUserRequest updateUserRequest, CancellationToken cancellationToken)
     {
-        try
-        {
-            await userService.UpdateAsync(id, updateUserRequest, cancellationToken);
-            return NoContent();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound("User not found.");
-        }
+        await userService.UpdateAsync(id, updateUserRequest, cancellationToken);
+        return NoContent();
     }
 
     [HttpDelete("{id}")]

@@ -35,21 +35,16 @@ public class SubscriptionsController(ISubscriptionService subscriptionService) :
         return CreatedAtAction(nameof(GetById), new { id = subscription.Id }, subscription);
     }
 
+
+    //TODO revise the update method to handle exceptions and return appropriate responses
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(
         [FromRoute] Guid id,
         [FromBody] UpdateSubscriptionRequest request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            await subscriptionService.UpdateAsync(id, request, cancellationToken);
-            return NoContent();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
+        await subscriptionService.UpdateAsync(id, request, cancellationToken);
+        return NoContent();
     }
 
     [HttpDelete("{id}")]
