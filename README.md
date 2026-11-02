@@ -1,4 +1,4 @@
-# 💰 Monetis — API
+﻿# 💰 Monetis — API
 
 > API back-end da plataforma de finanças pessoais Monetis. Controle de receitas, despesas, assinaturas, transferências e relatórios mensais.
 
@@ -197,3 +197,5 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 ---
 
 <p align="center">Feito com ❤️ por <a href="https://github.com/ViniciusMoraisAraujo">ViniciusMoraisAraujo</a></p>
+
+<!-- sync: repository update -->
