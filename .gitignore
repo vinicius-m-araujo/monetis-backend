@@ -5,7 +5,7 @@
 
 # dotenv files
 .env
-**/appsettings.Development.json
+src/Monetis.API/appsetting.Development.json
 
 # User-specific files
 *.rsuser
