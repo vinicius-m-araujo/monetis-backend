@@ -1,201 +1,172 @@
-﻿# 💰 Monetis — API
+# 💰 Monetis — API
 
-> API back-end da plataforma de finanças pessoais Monetis. Controle de receitas, despesas, assinaturas, transferências e relatórios mensais.
+API REST para gerenciamento de finanças pessoais, desenvolvida em ASP.NET Core e SQL Server. O repositório também funciona como laboratório de aprendizado e evolução de arquitetura de software.
 
-![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow)
-![License](https://img.shields.io/badge/license-MIT-blue)
-![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
-![EF Core](https://img.shields.io/badge/EF%20Core-10.0-512BD4?logo=dotnet)
+> 🚧 Em desenvolvimento. A presença de um endpoint ou componente não significa que todos os cenários estejam cobertos por testes ou prontos para produção.
 
----
+## Funcionalidades atuais
 
-## 📋 Sobre o Projeto
+- Cadastro e autenticação de usuários com JWT.
+- Cadastro, consulta, edição e exclusão de contas, cartões e categorias.
+- Categorias compartilhadas do sistema e categorias do usuário.
+- Registro, consulta, edição e pagamento de despesas; criação de parcelas no cartão de crédito.
+- Registro e gerenciamento de receitas.
+- Cadastro e gerenciamento de assinaturas, com geração da primeira despesa na criação e cancelamento lógico.
+- Transferências entre contas, com edição de valor e cancelamento conforme as regras de domínio.
+- Endpoint autenticado para marcar despesas vencidas e um serviço em segundo plano registrado para esse processamento.
 
-O **Monetis** é uma plataforma full stack para gerenciamento de finanças pessoais. Este repositório contém o **back-end** da aplicação, responsável por toda a lógica de negócio, persistência de dados e exposição da API REST.
+Dashboard e relatório mensal ainda não possuem controllers neste repositório. A geração periódica das próximas despesas de assinaturas também não está conectada a um agendador.
 
-> 🚧 Projeto em desenvolvimento ativo — também utilizado como laboratório de aprendizado de arquitetura de software.
+## Stack e configuração
 
----
+| Componente | Configuração no repositório |
+|---|---|
+| Framework | .NET / ASP.NET Core 10 (`net10.0`) |
+| SDK | `10.0.111`, com `rollForward: latestFeature` em `global.json` |
+| C# | `LangVersion: latest`, nullable habilitado |
+| Persistência | EF Core 10.0.13 e SQL Server |
+| Autenticação | JWT Bearer 10.0.7 |
+| Validação | FluentValidation 12.2.0 |
+| Documentação HTTP | Swagger / Swashbuckle e OpenAPI, em Development |
+| Testes | xUnit, FluentAssertions e coverlet |
+| Análise estática | Analisadores .NET e SonarAnalyzer; warnings tratados como erros |
 
-## ✨ Funcionalidades
+As versões de pacotes são centralizadas em [Directory.Packages.props](Directory.Packages.props), e as propriedades comuns de build em [Directory.Build.props](Directory.Build.props).
 
-- 📥 Lançamento de receitas e despesas
-- 💳 Controle de despesas parceladas no cartão de crédito
-- 🔁 Assinaturas recorrentes com geração automática de despesas
-- 🔀 Transferências entre contas com reversão no mesmo dia
-- 🏷️ Categorização de transações (categorias do sistema + personalizadas)
-- 📊 Dashboard com gráficos e resumos *(em breve)*
-- 📅 Relatório mensal detalhado *(em breve)*
-- 🔐 Autenticação JWT com multi-tenancy por usuário
+## Arquitetura
 
----
+A solução está organizada em quatro camadas, seguindo a proposta de Clean Architecture:
 
-## 🛠️ Tecnologias
-
-| Tecnologia | Versão | Descrição |
-|---|---|---|
-| ![.NET](https://img.shields.io/badge/.NET-512BD4?style=flat&logo=dotnet&logoColor=white) | 10.0 | Framework back-end |
-| ![C#](https://img.shields.io/badge/C%23-239120?style=flat&logo=csharp&logoColor=white) | 13 | Linguagem principal |
-| ![SQL Server](https://img.shields.io/badge/SQL%20Server-CC2927?style=flat&logo=microsoftsqlserver&logoColor=white) | - | Banco de dados relacional |
-| Entity Framework Core | 10.0 | ORM e migrations |
-| FluentValidation | 11.9 | Validação de inputs |
-| JWT Bearer | 10.0 | Autenticação |
-| Scalar / Swagger | - | Documentação da API |
-
----
-
-## 🏛️ Arquitetura
-
-O projeto segue os princípios da **Clean Architecture**, separando responsabilidades em camadas com dependências que apontam sempre para o centro (domínio).
-
-```
-Monetis.API              → Controllers, Middlewares, Background Services
-Monetis.Application      → Services, DTOs, Validators, Interfaces
-Monetis.Infrastructure   → EF Core, Repositories, JWT, PasswordHasher
-Monetis.Domain           → Entities, Enums, Exceptions, Interfaces
+```text
+src/
+  Monetis.Domain/          Entidades, enums e exceções de domínio
+  Monetis.Application/     Serviços, DTOs, validadores e abstrações
+  Monetis.Infrastructure/  EF Core, repositórios, Unit of Work e segurança
+  Monetis.API/             Controllers, middlewares e serviço em segundo plano
+tests/
+  Monetis.Domain.Tests/    Testes unitários de domínio
 ```
 
-### Por que Clean Architecture?
+- **Domain:** não declara referências a outros projetos nem pacotes específicos no seu `.csproj`; recebe os analisadores definidos globalmente.
+- **Application:** referencia o Domain e define as interfaces de persistência, segurança e serviços em `Abstractions`.
+- **Infrastructure:** implementa essas abstrações e registra persistência e autenticação na injeção de dependências.
+- **API:** compõe os serviços e expõe os casos de uso por HTTP.
 
-Por se tratar de um sistema de finanças pessoais (SaaS), o domínio possui regras de negócio complexas — parcelamento, assinaturas recorrentes, transferências com reversão. A separação em camadas garante que essas regras vivam no `Domain`, independentes de banco de dados ou framework web, facilitando testes e evolução do sistema.
+### Persistência e regras financeiras
 
----
+Os repositórios compartilham operações em `BaseRepository<T>`. A classe `UnitOfWork` implementa `IUnitOfWork`: atribui o usuário às novas entidades com proprietário e chama `SaveChangesAsync` no `MonetisDataContext`.
 
-## 🎨 Design Patterns
+Criação de transferência, pagamento de despesa e criação de assinatura persistem suas alterações por um `CommitAsync` ao final do caso de uso. Isso não constitui garantia de proteção contra atualizações concorrentes de saldo.
 
-### Repository Pattern
-Cada agregado possui sua interface de repositório definida no `Domain` e implementada na `Infrastructure`. Isso desacopla a lógica de negócio da tecnologia de persistência.
+`Expense`, `Income` e `Transfer` herdam de `Transaction` e usam TPC (Table Per Concrete Type), com tabelas separadas. O valor de transação é mapeado como `decimal(18,2)`.
 
-```
-IExpenseRepository (Domain)  ←  ExpenseRepository : BaseRepository<Expense> (Infrastructure)
-```
+### Contexto do usuário
 
-O `BaseRepository<T>` centraliza as operações genéricas (`GetById`, `Create`, `Update`, `Delete`), evitando repetição.
+O contexto autenticado é resolvido a partir do JWT pelo `UserContextMiddleware`. Filtros globais no EF Core restringem as entidades com proprietário ao usuário resolvido; categorias também permitem os registros compartilhados cujo `UserId` é nulo. O `UserResourceGuard` oferece consultas para validar contas, cartões e categorias relacionados aos casos de uso.
 
-### Unit of Work
-O `MonetisDataContext` implementa `IUnitOfWork`, centralizando o `SaveChanges` em um único ponto. Operações que criam múltiplos objetos (ex: criar uma assinatura + sua primeira despesa) são persistidas atomicamente num único `CommitAsync`.
+Esses mecanismos não substituem a verificação de autorização em cada fluxo nem testes de integração de isolamento entre usuários.
 
-```csharp
-subscriptionRepository.Create(subscription);
-expenseRepository.Create(firstExpense);
-await unitOfWork.CommitAsync(); // um único SaveChanges
-```
+### Processamento de despesas vencidas
 
-> ⚠️ **Em progresso:** operações críticas como `TransferService.CreateAsync`, `ExpenseService.PayExpenseAsync` e `SubscriptionService.CreateAsync` estão recebendo `IDbContextTransaction` para garantir rollback em caso de falha parcial.
+O `OverDueExpenseProcessorService` cria um escopo de serviços e agenda a execução diária para 00:01 UTC. O processamento consulta despesas vencidas e atualiza seu estado.
 
-### Multi-tenancy
-O Monetis é um SaaS — uma única instância da aplicação serve múltiplos usuários simultaneamente, onde cada usuário é um **tenant** isolado. A estratégia adotada é **shared database, shared schema**, com isolamento garantido via `UserId` como identificador do tenant.
+**Escopo atual:** `ExpenseRepository.GetOverdueAsync` usa `IgnoreQueryFilters()` para consultar despesas pendentes vencidas de todos os usuários. Tanto o serviço em segundo plano quanto o endpoint manual chamam esse método; portanto, o processamento manual também tem alcance global, embora exija autenticação.
 
-Cada entidade que pertence a um usuário herda de `UserOwnedEntity`. O `MonetisDataContext` aplica automaticamente um **query filter global** por tenant em todas essas entidades, garantindo que nenhuma query retorne dados de outro usuário — sem necessidade de filtrar manualmente em cada consulta.
-
-```csharp
-// Aplicado automaticamente para todas as entidades UserOwnedEntity
-builder.Entity<T>().HasQueryFilter(e => e.UserId == userContext.UserId);
-```
-
-O `UserId` (tenant) é extraído do JWT pelo `UserContextMiddleware`, populado no `UserContext` (scoped) e injetado no `DbContext` — tornando o isolamento entre tenants completamente transparente para os serviços.
-
-### TPC (Table Per Concrete Type) — Herança de Transações
-`Expense`, `Income` e `Transfer` herdam de `Transaction`, mas cada um possui sua própria tabela no banco (`Expenses`, `Incomes`, `Transfers`). Isso evita colunas nulas desnecessárias (problema do TPH) mantendo a hierarquia de domínio.
-
-### Domain Exceptions
-Regras de negócio inválidas lançam exceções de domínio tipadas (ex: `ExpenseAlreadyPaidException`, `TransferInsufficientFundsException`). O `ExceptionMiddleware` as intercepta e retorna respostas HTTP padronizadas com `ErrorCode`, sem vazar stack trace em produção.
-
-### Background Service
-`OverdueExpenseProcessorService` roda como `IHostedService`, processando despesas vencidas uma vez por dia sem bloquear o pipeline da API.
-
----
-
-## 🚀 Como executar
+## Executar localmente
 
 ### Pré-requisitos
 
-- [.NET SDK 10+](https://dotnet.microsoft.com/download)
-- [SQL Server](https://www.microsoft.com/pt-br/sql-server/sql-server-downloads)
-
-### Instalação
-
-```bash
-git clone https://github.com/ViniciusMoraisAraujo/monetis.git
-cd monetis
-```
-
-### Variáveis de ambiente
-
-Crie `src/Monetis.API/appsettings.Development.json`:
-
-```json
-{
-  "ConnectionStrings": {
-    "MonetisConnection": "Server=localhost,1433;Database=MonetisDb;User Id=sa;Password=sua_senha;TrustServerCertificate=True;"
-  },
-  "Jwt": {
-    "Key": "sua_chave_secreta_base64",
-    "Issuer": "Monetis",
-    "Audience": "MonetisUsers"
-  }
-}
-```
-
-### Rodando
+- SDK .NET 10 compatível com `global.json`.
+- SQL Server acessível e um banco preparado com o esquema das migrations.
+- Configuração local de conexão e JWT.
 
 ```bash
+git clone https://github.com/ViniciusMoraisAraujo/monetis-backend.git
+cd monetis-backend
 dotnet restore
-dotnet ef database update --project src/Monetis.Infrastructure --startup-project src/Monetis.API
-dotnet run --project src/Monetis.API
 ```
 
-Documentação disponível em `http://localhost:5074/swagger` após iniciar.
+### Configuração da API
 
----
+Forneça as opções por variáveis de ambiente ou por um provedor de configuração local apropriado. Não versione credenciais.
 
-## 📡 Endpoints principais
+| Variável de ambiente | Finalidade |
+|---|---|
+| `ConnectionStrings__MonetisConnection` | Conexão com SQL Server |
+| `Jwt__Key` | Chave secreta de assinatura, com no mínimo 32 caracteres conforme `JwtOptions` |
+| `Jwt__Issuer` | Emissor esperado do token |
+| `Jwt__Audience` | Público esperado do token |
+| `Jwt__DurationInMinutes` | Duração; padrão 240 e faixa validada de 220 a 250 minutos |
 
-| Método | Rota | Descrição |
+A chave JWT é lida como texto UTF-8 pela implementação, sem decodificação Base64.
+
+### Preparar o banco
+
+A aplicação não aplica migrations automaticamente no `Program.cs`. Prepare apenas o banco local escolhido para desenvolvimento.
+
+A factory de design time atual resolve `../Monetis.API` a partir do diretório de execução e carrega os arquivos JSON de configuração. Por isso, para o comando abaixo, configure localmente `ConnectionStrings:MonetisConnection` em `src/Monetis.API/appsettings.Development.json` e execute a partir de `src/Monetis.Infrastructure`. Essa factory não lê as variáveis de ambiente listadas acima.
+
+Com a ferramenta `dotnet-ef` compatível com EF Core 10 instalada:
+
+```bash
+cd src/Monetis.Infrastructure
+dotnet ef database update --startup-project ../Monetis.API
+cd ../..
+```
+
+Esse comando altera o banco indicado na configuração; confira o destino antes de executá-lo.
+
+### Iniciar a API
+
+```bash
+dotnet run --project src/Monetis.API --launch-profile https
+```
+
+No perfil `https`, a API usa `https://localhost:7260` e `http://localhost:5074`. Em Development:
+
+- Swagger UI: `https://localhost:7260/swagger`.
+- OpenAPI: `https://localhost:7260/openapi/v1.json`.
+
+A política CORS atual permite a origem `http://localhost:4200`. O host registra o serviço de despesas vencidas ao iniciar.
+
+## Endpoints
+
+As rotas abaixo usam a grafia dos controllers. Para operações sobre um recurso existente, acrescente `/{id}` conforme indicado pelo Swagger.
+
+| Método | Rota | Operação |
 |---|---|---|
-| POST | `/api/auth/login` | Autenticação — retorna JWT |
-| POST | `/api/users` | Cadastro de usuário |
-| GET/POST/PUT/DELETE | `/api/accounts` | Contas bancárias |
-| GET/POST/PUT/DELETE | `/api/cards` | Cartões de crédito |
-| GET/POST/PUT/DELETE | `/api/categories` | Categorias |
-| GET/POST/PUT/DELETE | `/api/expenses` | Despesas |
-| POST | `/api/expenses/installments` | Criar despesa parcelada |
-| POST | `/api/expenses/{id}/pay` | Pagar despesa |
-| GET/POST/PUT/DELETE | `/api/incomes` | Receitas |
-| GET/POST/PUT/DELETE | `/api/subscriptions` | Assinaturas recorrentes |
-| GET/POST/PUT/DELETE | `/api/transfers` | Transferências entre contas |
+| POST | `/api/Auth/register` | Cadastro público de usuário |
+| POST | `/api/Auth/login` | Login público; retorna `{ "token": "..." }` |
+| GET, PUT, DELETE | `/api/Users/{id}` | Consultar, atualizar ou excluir usuário |
+| GET | `/api/Users` | Listar usuários |
+| GET, POST | `/api/Accounts`, `/api/Cards`, `/api/Categories` | Listar ou criar |
+| GET, PUT, DELETE | `/api/Accounts/{id}`, `/api/Cards/{id}`, `/api/Categories/{id}` | Consultar, atualizar ou excluir |
+| GET, POST | `/api/Expenses` | Listar ou criar despesas |
+| GET, PUT | `/api/Expenses/{id}` | Consultar ou atualizar despesa |
+| POST | `/api/Expenses/installments` | Criar despesas parceladas |
+| POST | `/api/Expenses/{id}/pay` | Pagar despesa |
+| POST | `/api/Expenses/process-overdue` | Processar despesas vencidas de todos os usuários |
+| GET, POST | `/api/Incomes`, `/api/Subscriptions`, `/api/Transfers` | Listar ou criar |
+| GET, PUT, DELETE | `/api/Incomes/{id}`, `/api/Subscriptions/{id}`, `/api/Transfers/{id}` | Consultar, atualizar ou excluir/cancelar |
 
-> Documentação completa via Swagger/Scalar após iniciar o servidor.
+As rotas de recursos exigem autenticação Bearer. Após o login, envie `Authorization: Bearer <token>`. Os contratos de entrada e saída estão em `src/Monetis.Application/DTOs` e na documentação gerada pela API.
 
----
+## Verificação local
 
-## 🗺️ Roadmap
+Na raiz do repositório:
 
-- [x] Estrutura Clean Architecture
-- [x] Autenticação JWT
-- [x] Multi-tenancy por usuário via query filters globais no EF Core
-- [x] CRUD de contas, cartões e categorias
-- [x] Despesas simples e parceladas
-- [x] Receitas
-- [x] Assinaturas recorrentes
-- [x] Transferências entre contas
-- [x] Background service para despesas vencidas
-- [x] Rate limiting
-- [ ] Transações de banco (`IDbContextTransaction`) nas operações críticas
-- [ ] Dashboard e relatório mensal
-- [ ] Testes unitários
-- [ ] Deploy
+```bash
+dotnet build Monetis.slnx
+dotnet test Monetis.slnx
+```
 
-> 📌 Para o checklist detalhado, bugs conhecidos e roadmap de evolução técnica, consulte o [Master Checklist](docs/CHECKLIST.md).
+A suíte presente na `main` inclui testes de `User` e `UserOwnedEntity`. Ela ainda não representa cobertura abrangente das operações financeiras. Não há projeto de testes de integração na solução atual.
 
----
+## Evolução
 
-## 📄 Licença
+- Ampliar testes de domínio e adicionar testes de integração de persistência e autorização.
+- Validar concorrência nas operações de saldo.
+- Completar a automação de recorrência das assinaturas e revisar a autorização do processamento global de despesas.
+- Desenvolver dashboard e relatório mensal.
 
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
-
----
-
-<p align="center">Feito com ❤️ por <a href="https://github.com/ViniciusMoraisAraujo">ViniciusMoraisAraujo</a></p>
-
-<!-- sync: repository update -->
+Consulte a [visão geral](docs/00-visao-geral.md) para contexto adicional e a [integração com Trello](docs/integracao-trello.md) para o fluxo de acompanhamento técnico. O comportamento descrito neste README foi conferido no código da `main`; documentos de planejamento podem representar objetivos ainda não implementados.
